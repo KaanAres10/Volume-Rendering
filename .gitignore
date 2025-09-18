@@ -1,0 +1,68 @@
+# OS 
+.DS_Store
+Thumbs.db
+
+# Node / package managers
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Transpiled / build outputs
+dist/
+build/
+.out/
+.tmp/
+.temp/
+.cache/
+.cache-loader/
+.esbuild/
+.vite/
+.svelte-kit/
+.next/
+.nuxt/
+storybook-static/
+coverage/
+
+# App artifacts
+*.log
+*.pid
+*.seed
+*.tgz
+
+# Env / secrets
+.env
+.env.*.local
+.env.local
+*.local
+
+# JetBrains / WebStorm
+.idea/
+*.iml
+
+# VSCode 
+.vscode/* 
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+# Tests & reports
+junit.xml
+test-results/
+cypress/videos/
+cypress/screenshots/
+
+# Misc dev tools
+.sass-cache/
+.parcel-cache/
+.fusebox/
+.nyc_output/
+webpack-stats.json
+
+# Generated assets
+*.map
