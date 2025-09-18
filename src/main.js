@@ -8,15 +8,18 @@ import chroma from 'chroma-js';
 
 import GUI from 'lil-gui';
 
-// Example compositions (whatever your shader supports)
+
+const COMP = { MIP:0, ISO:1, EA:2, AVG:3 };
+
 const compositions = [
-    { name: 'Maximum intensity', id: 'MIP' },
+    { name: 'Maximum Intensity', id: 'MIP' },
+    { name: 'First Hit',        id: 'ISO' },
+    { name: 'Emission/Absorption', id: 'EA' },
     { name: 'Average',           id: 'AVG' },
-    { name: 'Isosurface',        id: 'ISO' },
 ];
 
 const renderProps = {
-    composition: 'Maximum intensity',
+    composition: 'Maximum Intensity',
     rotations: { x: false, y: true, z: false },
     speed: 0.002,
     samplingRate: 1.0,
@@ -75,37 +78,6 @@ export function makeColorTexture(count = 256) {
 
     return texture;
 }
-
-// GUI
-// Create GUI
-const gui = new GUI();
-
-// Composition selector
-gui.add(renderProps, 'composition', [
-    'Maximum intensity',
-    'Average',
-    'Isosurface'
-]);
-
-// Rotations as checkboxes
-const rotFolder = gui.addFolder('Rotation');
-rotFolder.add(renderProps.rotations, 'x').name('X');
-rotFolder.add(renderProps.rotations, 'y').name('Y');
-rotFolder.add(renderProps.rotations, 'z').name('Z');
-
-gui.add(renderProps, 'invertColor').onChange(v => {
-    material.uniforms.invertColor.value = v;
-});
-
-// update these uniforms too
-gui.add(renderProps, 'samplingRate', 0.1, 4.0, 0.1)
-    .onChange(v => material.uniforms.samplingRate.value = v);
-gui.add(renderProps, 'threshold', 0.0, 1.0, 0.0001)
-    .onChange(v => material.uniforms.threshold.value = v);
-gui.add(renderProps, 'alphaScale', 0.0, 2.0, 0.0001)
-    .onChange(v => material.uniforms.alphaScale.value = v);
-
-
 
 // Retrieving data
 const dataDescription = {
@@ -168,7 +140,8 @@ const material = new THREE.RawShaderMaterial({
         samplingRate: {value: renderProps.samplingRate},
         threshold: {value: renderProps.threshold},
         alphaScale: {value: renderProps.alphaScale},
-        invertColor: {value: renderProps.invertColor}
+        invertColor: {value: renderProps.invertColor},
+        composition: {value: COMP.MIP}
     },
     vertexShader: VERT,
     fragmentShader: FRAG,
@@ -201,6 +174,52 @@ document.body.appendChild(renderer.domElement);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.addEventListener("change", () => renderer.render(scene, camera));
+
+
+// GUI
+// Create GUI
+const gui = new GUI();
+
+// Rotations as checkboxes
+const rotFolder = gui.addFolder('Rotation');
+rotFolder.add(renderProps.rotations, 'x').name('X');
+rotFolder.add(renderProps.rotations, 'y').name('Y');
+rotFolder.add(renderProps.rotations, 'z').name('Z');
+
+gui.add(renderProps, 'invertColor').onChange(v => {
+    material.uniforms.invertColor.value = v;
+});
+
+// update these uniforms too
+gui.add(renderProps, 'samplingRate', 0.1, 4.0, 0.1)
+    .onChange(v => material.uniforms.samplingRate.value = v);
+gui.add(renderProps, 'threshold', 0.0, 1.0, 0.0001)
+    .onChange(v => material.uniforms.threshold.value = v);
+gui.add(renderProps, 'alphaScale', 0.0, 2.0, 0.0001)
+    .onChange(v => material.uniforms.alphaScale.value = v);
+
+gui.add(renderProps, 'composition', [
+    'Maximum Intensity',
+    'First Hit',
+    'Emission/Absorption',
+    'Average'
+]).onChange(name => {
+    const id = compositions.find(c => c.name === name)?.id || 'MIP';
+    material.uniforms.composition.value =
+        id === 'MIP' ? COMP.MIP :
+            id === 'ISO' ? COMP.ISO :
+                id === 'EA'  ? COMP.EA  : COMP.AVG;
+
+    if (id === 'EA') {
+        material.transparent = true;
+        material.blending = THREE.NormalBlending;
+        material.needsUpdate = true;
+    } else {
+        material.transparent = false;               // MIP/ISO/AVG as opaque
+        material.blending = THREE.NoBlending;
+        material.needsUpdate = true;
+    }
+});
 
 
 // Rendering Loop

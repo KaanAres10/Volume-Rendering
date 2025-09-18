@@ -7,6 +7,7 @@ uniform float samplingRate;
 uniform float threshold;
 uniform float alphaScale;
 uniform bool invertColor;
+uniform int composition;
 
 in vec3 vOrigin;
 in vec3 vDirection;
@@ -33,7 +34,7 @@ vec2 intersectAABB(vec3 rayOrigin, vec3 rayDir, vec3 boxMin, vec3 boxMax) {
     return vec2(tNear, tFar);
 }
 
-vec4 compose(vec4 color, vec3 entryPoint, vec3 rayDir, float samples, float tStart, float tEnd, float tIncr) {
+vec4 MIP(vec4 color, vec3 entryPoint, vec3 rayDir, float samples, float tStart, float tEnd, float tIncr) {
     float density = 0.0;
     for (float i = 0.0; i < samples; i += 1.0) {
         float t = tStart + tIncr * i;
@@ -55,6 +56,66 @@ vec4 compose(vec4 color, vec3 entryPoint, vec3 rayDir, float samples, float tSta
     color.a = alphaScale * (invertColor ? 1.0 - density: density);
 
     return color;
+}
+
+vec4 IsoSurface(vec4 color, vec3 entryPoint, vec3 rayDir, float samples, float tStart, float tEnd, float tIncr) {
+    for (float i = 0.0; i < samples; i += 1.0) {
+        float t = tStart + tIncr * i;
+        vec3 p = entryPoint + rayDir * t;
+
+        float value = sampleData(p);
+
+        if (value >= threshold || t > tEnd) {
+            color.rgb = sampleColor(value).rgb;
+            color.a = alphaScale;
+            break;
+        }
+    }
+
+    return color;
+}
+
+vec4 EmissonAbsorption(vec4 color, vec3 entryPoint, vec3 rayDir, float samples, float tStart, float tEnd, float tIncr) {
+    for (float i = 0.0; i < samples; i += 1.0) {
+        float t = tStart + tIncr * i;
+        vec3 p = entryPoint + rayDir * t;
+
+        float value = sampleData(p);
+        vec4 valueColor = sampleColor(value);
+
+        // Front to Back Alpha Blending
+        valueColor.a *= value * alphaScale;
+        color.rgb += (1.0 - color.a) * valueColor.a * valueColor.rgb;
+        color.a += (1.0 - color.a) * valueColor.a;
+
+        // Early Exit
+        if (color.a >= 0.97 || t > tEnd) {
+            break;
+        }
+    }
+    return color;
+}
+
+vec4 Average(vec4 color, vec3 entryPoint, vec3 rayDir, float samples, float tStart, float tEnd, float tIncr) {
+    float sum = 0.0;
+    float count = 0.0;
+
+    for (float i = 0.0; i < samples; i += 1.0) {
+        float t = tStart + tIncr * i;
+        if (t > tEnd) {
+            break;
+        }
+        vec3 p = entryPoint + rayDir * t;
+
+        float value = sampleData(p);
+
+        sum += value;
+        count++;
+
+    }
+    float mean = (count > 0.0) ? (sum / count) : 0.0;
+    vec3 rgb = sampleColor(mean).rgb;
+    return vec4(rgb, alphaScale);
 }
 
 
@@ -81,7 +142,16 @@ void main() {
 
         vec3 texEntry = (entryPoint - aabbmin) / (aabbmax - aabbmin);
 
-        color = compose(color, texEntry, rayDir, samples, tStart, tEnd, tIncr);
+        if (composition == 0)
+        {
+            color = MIP(color, texEntry, rayDir, samples, tStart, tEnd, tIncr);
+        } else if (composition == 1){
+            color = IsoSurface(color, texEntry, rayDir, samples, tStart, tEnd, tIncr);
+        } else if (composition == 2) {
+            color = EmissonAbsorption(color, texEntry, rayDir, samples, tStart, tEnd, tIncr);
+        } else if (composition == 3) {
+            color = Average(color, texEntry, rayDir, samples, tStart, tEnd, tIncr);
+        }
     }
     frag_color = color;
 }
