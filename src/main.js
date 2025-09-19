@@ -79,6 +79,7 @@ export function makeColorTexture(count = 256) {
     return texture;
 }
 
+
 // Retrieving data
 const dataDescription = {
     name: "Head",
@@ -180,46 +181,52 @@ controls.addEventListener("change", () => renderer.render(scene, camera));
 // Create GUI
 const gui = new GUI();
 
-// Rotations as checkboxes
-const rotFolder = gui.addFolder('Rotation');
-rotFolder.add(renderProps.rotations, 'x').name('X');
-rotFolder.add(renderProps.rotations, 'y').name('Y');
-rotFolder.add(renderProps.rotations, 'z').name('Z');
-
-gui.add(renderProps, 'invertColor').onChange(v => {
-    material.uniforms.invertColor.value = v;
-});
-
-// update these uniforms too
-gui.add(renderProps, 'samplingRate', 0.1, 4.0, 0.1)
-    .onChange(v => material.uniforms.samplingRate.value = v);
-gui.add(renderProps, 'threshold', 0.0, 1.0, 0.0001)
-    .onChange(v => material.uniforms.threshold.value = v);
-gui.add(renderProps, 'alphaScale', 0.0, 2.0, 0.0001)
-    .onChange(v => material.uniforms.alphaScale.value = v);
-
-gui.add(renderProps, 'composition', [
+const compCtrl = gui.add(renderProps, 'composition', [
     'Maximum Intensity',
     'First Hit',
     'Emission/Absorption',
     'Average'
-]).onChange(name => {
+]).name('Composition');
+
+// Keep refs for toggling
+const isoCtrl = gui.add(renderProps, 'threshold', 0.0, 1.0, 0.0001)
+    .name('Iso Value')
+    .onChange(v => {
+        renderProps.threshold = v;
+        material.uniforms.threshold.value = v;
+    });
+
+const alphaCtrl = gui.add(renderProps, 'alphaScale', 0.0, 2.0, 0.0001)
+    .name('Alpha scale')
+    .onChange(v => material.uniforms.alphaScale.value = v);
+gui.add(renderProps, 'samplingRate', 0.1, 4.0, 0.1)
+    .name('Sampling rate')
+    .onChange(v => material.uniforms.samplingRate.value = v);
+
+gui.add(renderProps, 'invertColor').name('Invert color')
+    .onChange(v => { material.uniforms.invertColor.value = v; });
+const rotFolder = gui.addFolder('Rotation');
+
+rotFolder.add(renderProps.rotations, 'x').name('X');
+rotFolder.add(renderProps.rotations, 'y').name('Y');
+rotFolder.add(renderProps.rotations, 'z').name('Z');
+
+// Hook up composition change
+compCtrl.onChange(name => {
     const id = compositions.find(c => c.name === name)?.id || 'MIP';
     material.uniforms.composition.value =
         id === 'MIP' ? COMP.MIP :
             id === 'ISO' ? COMP.ISO :
                 id === 'EA'  ? COMP.EA  : COMP.AVG;
 
-    if (id === 'EA') {
-        material.transparent = true;
-        material.blending = THREE.NormalBlending;
-        material.needsUpdate = true;
-    } else {
-        material.transparent = false;               // MIP/ISO/AVG as opaque
-        material.blending = THREE.NoBlending;
-        material.needsUpdate = true;
-    }
+    material.needsUpdate = true;
+
+    // Visibility toggles
+    (id === 'ISO') ? isoCtrl.show()   : isoCtrl.hide();
 });
+
+// Set initial visibility
+isoCtrl.hide();
 
 
 // Rendering Loop
