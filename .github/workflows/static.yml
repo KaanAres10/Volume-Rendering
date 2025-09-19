@@ -1,8 +1,8 @@
-name: Deploy Vite app to GitHub Pages
+name: Deploy Vite site to GitHub Pages
 
 on:
   push:
-    branches: ["main"]
+    branches: [ main ]
   workflow_dispatch:
 
 permissions:
@@ -11,8 +11,8 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages"
-  cancel-in-progress: false
+  group: pages
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -26,14 +26,18 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: Volume-Rendering/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: Volume-Rendering
+        working-directory: DirectVolume-Renderer
         run: npm ci
 
-      - name: Build (via Node to avoid exec-bit issues)
-        working-directory: Volume-Rendering
+      # Safety: if the vite bin lost its exec bit in CI, restore it
+      - name: Ensure vite is executable
+        run: chmod +x node_modules/vite/bin/vite.js || true
+
+      # Bulletproof call: run vite via node to bypass exec-bit issues
+      - name: Build
         run: node ./node_modules/vite/bin/vite.js build
 
       - name: Configure Pages
@@ -42,7 +46,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: Volume-Rendering/dist
+          path: DirectVolume-Renderer/dist
 
   deploy:
     needs: build
