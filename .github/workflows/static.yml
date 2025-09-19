@@ -29,7 +29,6 @@ jobs:
           cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: DirectVolume-Renderer
         run: npm ci
 
       # Safety: if the vite bin lost its exec bit in CI, restore it
