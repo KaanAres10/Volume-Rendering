@@ -8,6 +8,13 @@ import chroma from 'chroma-js';
 
 import GUI from 'lil-gui';
 
+import * as d3 from 'd3';
+
+import { TransferFunctionEditor }   from './tfeditor_js/TransferFunctionEditor.js';
+import { TransparencyEditor }   from './tfeditor_js/TransparencyEditor.js';
+import { ColorMapEditor }   from './tfeditor_js/ColorMapEditor.js';
+import { ColorPicker }   from './tfeditor_js/ColorPicker.js';
+
 
 const COMP = { MIP:0, ISO:1, EA:2, AVG:3 };
 
@@ -48,6 +55,8 @@ export async function loadUint8VolumeFromZip(url, dims) {
     }
     return data;
 }
+
+
 
 export function makeColorTexture(count = 256) {
     // Create a color scale based on the selected palette using chroma-js.
@@ -171,15 +180,14 @@ renderer.setSize(width, height);
 renderer.setPixelRatio(devicePixelRatio);
 renderer.domElement.style.border = "1px solid black";
 
-document.body.appendChild(renderer.domElement);
+document.getElementById("three-root").appendChild(renderer.domElement);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.addEventListener("change", () => renderer.render(scene, camera));
 
-
 // GUI
 // Create GUI
-const gui = new GUI();
+const gui = new GUI({container: document.getElementById('gui-mount')});
 
 const compCtrl = gui.add(renderProps, 'composition', [
     'Maximum Intensity',
@@ -211,6 +219,108 @@ rotFolder.add(renderProps.rotations, 'x').name('X');
 rotFolder.add(renderProps.rotations, 'y').name('Y');
 rotFolder.add(renderProps.rotations, 'z').name('Z');
 
+
+
+const tfFolder = gui.addFolder('Transfer Function');
+tfFolder.open();
+
+// Host inside the folder
+const tfHost = document.createElement('div');
+tfHost.style.width = '100%';
+tfHost.style.height = '300px';
+tfHost.style.borderRadius = '6px';
+tfHost.style.background = '#1f1f1f';
+
+// Buttons row
+const btnRow = document.createElement('div');
+btnRow.style.display = 'flex';
+btnRow.style.gap = '8px';
+btnRow.style.marginTop = '8px';
+
+const contentEl =
+    tfFolder.domElement.querySelector(':scope > .children')  // preferred
+    || tfFolder.domElement.querySelector('.children')        // fallback
+    || tfFolder.domElement.children[1];                      // last resort
+
+contentEl.appendChild(tfHost);
+contentEl.appendChild(btnRow);
+// Init editor
+const tf = new TransferFunctionEditor(tfHost, {
+    initialColorMap: {
+        colorStops: [
+            { stop: 0.0, color: 'blue' },
+            { stop: 0.5, color: 'white' },
+            { stop: 1.0, color: 'red' }
+        ],
+        interpolationMethod: 'HSL',
+        discrete: false,
+        bins: 8
+    }
+});
+
+
+function lerpAlpha(stops, x) {
+    if (!stops || !stops.length) return 1.0;
+    x = Math.min(1, Math.max(0, x));
+    const s = stops.slice().sort((a,b)=>a.stop-b.stop);
+    if (x <= s[0].stop) return s[0].alpha;
+    for (let i=0;i<s.length-1;i++){
+        const a=s[i], b=s[i+1];
+        if (x>=a.stop && x<=b.stop){
+            const t=(x-a.stop)/Math.max(1e-6,(b.stop-a.stop));
+            return (1-t)*a.alpha + t*b.alpha;
+        }
+    }
+    return s[s.length-1].alpha;
+}
+
+function makeTFTextureFromEditor(tfObj, count=256, alphaScale=1.0) {
+    const { colorMap, alphaStops } = tfObj;
+    const { colorStops, interpolationMethod='RGB', discrete=false, bins=8 } = colorMap;
+
+    const positions = colorStops.map(s=>s.stop);
+    const colorsStr = colorStops.map(s=>s.color);
+    const mode = interpolationMethod.toLowerCase();
+    const cscale = chroma.scale(colorsStr).domain(positions).mode(mode);
+
+    const lut = new Uint8Array(count*4);
+    const steps = discrete ? Math.max(2, (bins|0)) : count;
+
+    for (let i=0;i<count;i++){
+        let v = i/(count-1);
+        if (discrete){
+            const q = Math.floor(v*steps)/(steps-1);
+            v = Math.min(1, Math.max(0, q));
+        }
+        const [r,g,b] = cscale(v).rgb();
+        const a = Math.max(0, Math.min(1, lerpAlpha(alphaStops, v) * alphaScale));
+        const k = 4*i;
+        lut[k+0]=r|0; lut[k+1]=g|0; lut[k+2]=b|0; lut[k+3]=Math.round(255*a);
+    }
+
+    const tex = new THREE.DataTexture(lut, count, 1);
+    tex.format = THREE.RGBAFormat;
+    tex.type = THREE.UnsignedByteType;
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    tex.wrapS = THREE.ClampToEdgeWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.needsUpdate = true;
+    return tex;
+}
+
+function applyTransferFunction() {
+    const state = tf.getTransferFunction();
+    const tex = makeTFTextureFromEditor(state, 256, renderProps.alphaScale);
+    colorTexture = tex;
+    material.uniforms.colorTexture.value = tex;
+    material.uniforms.colorTexture.value.needsUpdate = true;
+}
+
+// Update LUT on change
+tf.addListener(applyTransferFunction);
+applyTransferFunction();
+
 // Hook up composition change
 compCtrl.onChange(name => {
     const id = compositions.find(c => c.name === name)?.id || 'MIP';
@@ -227,7 +337,6 @@ compCtrl.onChange(name => {
 
 // Set initial visibility
 isoCtrl.hide();
-
 
 // Rendering Loop
 function animate() {
