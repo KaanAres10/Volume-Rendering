@@ -26,7 +26,7 @@ const compositions = [
 ];
 
 const renderProps = {
-    composition: 'Maximum Intensity',
+    composition: 'Emission/Absorption',
     rotations: { x: false, y: true, z: false },
     speed: 0.002,
     samplingRate: 1.0,
@@ -104,12 +104,10 @@ const dataDescription = {
 };
 
 const dims = { x: dataDescription.xExtent, y: dataDescription.yExtent, z: dataDescription.zExtent };
-
 const dataValues = await loadUint8VolumeFromZip(
   "https://kaanares10.github.io/Volume-Rendering/head_256x256x109.zip",
   dims
 );
-
 console.log('Volume data loaded:');
 console.log('Type:', dataValues.constructor.name);
 console.log('Length:', dataValues.length);
@@ -132,7 +130,7 @@ let colorTexture = makeColorTexture();
 
 // Setting up 3D scene
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xffffff);
+scene.background = new THREE.Color("#1f1f1f");
 
 const geometry = new THREE.BoxGeometry(1, 1, 1);
 
@@ -155,7 +153,7 @@ const material = new THREE.RawShaderMaterial({
         threshold: {value: renderProps.threshold},
         alphaScale: {value: renderProps.alphaScale},
         invertColor: {value: renderProps.invertColor},
-        composition: {value: COMP.MIP}
+        composition: {value: COMP.EA}
     },
     vertexShader: VERT,
     fragmentShader: FRAG,
