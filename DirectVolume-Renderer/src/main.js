@@ -15,7 +15,6 @@ import { TransparencyEditor }   from './tfeditor_js/TransparencyEditor.js';
 import { ColorMapEditor }   from './tfeditor_js/ColorMapEditor.js';
 import { ColorPicker }   from './tfeditor_js/ColorPicker.js';
 
-import headZipUrl from './assets/head_256x256x109.zip?url';
 
 const COMP = { MIP:0, ISO:1, EA:2, AVG:3 };
 
@@ -105,7 +104,8 @@ const dataDescription = {
 };
 
 const dims = { x: dataDescription.xExtent, y: dataDescription.yExtent, z: dataDescription.zExtent };
-const dataValues = await loadUint8VolumeFromZip(headZipUrl, dims);
+
+const dataValues = await loadUint8VolumeFromZip(new URL("head_256x256x109.zip", import.meta.env.BASE_URL).toString(), dims);
 
 console.log('Volume data loaded:');
 console.log('Type:', dataValues.constructor.name);
