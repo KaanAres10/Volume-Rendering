@@ -105,7 +105,10 @@ const dataDescription = {
 
 const dims = { x: dataDescription.xExtent, y: dataDescription.yExtent, z: dataDescription.zExtent };
 
-const dataValues = await loadUint8VolumeFromZip(new URL("head_256x256x109.zip", import.meta.env.BASE_URL).toString(), dims);
+const dataValues = await loadUint8VolumeFromZip(
+  "https://kaanares10.github.io/Volume-Rendering/head_256x256x109.zip",
+  dims
+);
 
 console.log('Volume data loaded:');
 console.log('Type:', dataValues.constructor.name);
