@@ -1,2 +1,2 @@
 import { defineConfig } from 'vite';
-export default defineConfig({ base: '/' }); // user site
+export default defineConfig({ base: 'Volume-Rendering' }); // user site
