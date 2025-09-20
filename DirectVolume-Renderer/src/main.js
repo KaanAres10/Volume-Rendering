@@ -227,7 +227,7 @@ tfFolder.open();
 // Host inside the folder
 const tfHost = document.createElement('div');
 tfHost.style.width = '100%';
-tfHost.style.height = '300px';cd 
+tfHost.style.height = '300px';
 tfHost.style.borderRadius = '6px';
 tfHost.style.background = '#1f1f1f';
 
