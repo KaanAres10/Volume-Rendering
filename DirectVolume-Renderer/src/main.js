@@ -14,15 +14,41 @@ import { TransferFunctionEditor }   from './tfeditor_js/TransferFunctionEditor.j
 import { TransparencyEditor }   from './tfeditor_js/TransparencyEditor.js';
 import { ColorMapEditor }   from './tfeditor_js/ColorMapEditor.js';
 import { ColorPicker }   from './tfeditor_js/ColorPicker.js';
+import {update} from "three/addons/libs/tween.module.js";
 
 
 const COMP = { MIP:0, ISO:1, EA:2, AVG:3 };
+
 
 const compositions = [
     { name: 'Maximum Intensity', id: 'MIP' },
     { name: 'First Hit',        id: 'ISO' },
     { name: 'Emission/Absorption', id: 'EA' },
     { name: 'Average',           id: 'AVG' },
+];
+
+const SHADING = {
+    NONE: 0,
+    LAMBERT: 1,
+    PHONG: 2,
+    BLINN_PHONG: 3
+};
+
+const shadingOptions = [
+    { name: 'None', id: SHADING.NONE },
+    { name: 'Lambert', id: SHADING.LAMBERT },
+    { name: 'Phong', id: SHADING.PHONG },
+    { name: 'Blinn-Phong', id: SHADING.BLINN_PHONG }
+];
+
+const GRADIENT = {
+    CENTRAL: 0,
+    SOBEL: 1
+};
+
+const gradientOptions = [
+    { name: 'Central Difference', id: GRADIENT.CENTRAL },
+    { name: 'Sobel', id: GRADIENT.SOBEL }
 ];
 
 const renderProps = {
@@ -34,6 +60,8 @@ const renderProps = {
     palette: 'Greys',
     invertColor: true,
     alphaScale: 1.0,
+    shading: 'None',
+    gradient: 'Central Difference',
 };
 
 export async function loadUint8VolumeFromZip(url, dims) {
@@ -153,7 +181,21 @@ const material = new THREE.RawShaderMaterial({
         threshold: {value: renderProps.threshold},
         alphaScale: {value: renderProps.alphaScale},
         invertColor: {value: renderProps.invertColor},
-        composition: {value: COMP.EA}
+        composition: {value: COMP.EA},
+
+
+        shadingMode: { value: SHADING.NONE },
+
+        gradientMode: { value: GRADIENT.CENTRAL },
+
+        lightPosObj:   { value: new THREE.Vector3(0.8, 0.6, 0.8) }, // object space [-0.5,0.5]
+        lightColor:    { value: new THREE.Color(1,1,1) },
+        lightIntensity:{ value: 2.0 },
+        ambient:       { value: 0.5 },
+        shininess:     { value: 32.0 },
+        enableLighting:{ value: true },
+
+        densityScale: { value: 100.0 }
     },
     vertexShader: VERT,
     fragmentShader: FRAG,
@@ -198,6 +240,33 @@ const compCtrl = gui.add(renderProps, 'composition', [
     'Average'
 ]).name('Composition');
 
+const shadingCtrl = gui.add(renderProps, 'shading', shadingOptions.map(o => o.name))
+    .name('Shading')
+    .onChange(name => {
+        const id = shadingOptions.find(o => o.name === name)?.id ?? SHADING.NONE;
+        material.uniforms.shadingMode.value = id;
+
+        // show/hide gradient depending on shading
+        if (id === SHADING.NONE) {
+            gradientCtrl.hide();
+        } else {
+            gradientCtrl.show();
+        }
+        updateUI();
+    });
+
+const gradientCtrl = gui.add(renderProps, 'gradient', gradientOptions.map(o => o.name))
+    .name('Gradient')
+    .onChange(name => {
+        const id = gradientOptions.find(o => o.name === name)?.id ?? GRADIENT.CENTRAL;
+        material.uniforms.gradientMode.value = id;
+    });
+
+
+const densityCtrl = gui.add(material.uniforms.densityScale, 'value', 0.1, 300.0, 0.1)
+    .name('Density scale (σ)')
+    .onChange(v => { material.uniforms.densityScale.value = v; });
+
 // Keep refs for toggling
 const isoCtrl = gui.add(renderProps, 'threshold', 0.0, 1.0, 0.0001)
     .name('Iso Value')
@@ -209,9 +278,19 @@ const isoCtrl = gui.add(renderProps, 'threshold', 0.0, 1.0, 0.0001)
 const alphaCtrl = gui.add(renderProps, 'alphaScale', 0.0, 2.0, 0.0001)
     .name('Alpha scale')
     .onChange(v => material.uniforms.alphaScale.value = v);
+
+
 gui.add(renderProps, 'samplingRate', 0.1, 4.0, 0.1)
     .name('Sampling rate')
     .onChange(v => material.uniforms.samplingRate.value = v);
+
+
+
+const lightFolder = gui.addFolder('Lighting');
+const lightIntensityCtrl = lightFolder.add(material.uniforms.lightIntensity, 'value', 0.0, 10.0, 0.1).name('Intensity');
+const ambientCtrl        = lightFolder.add(material.uniforms.ambient, 'value', 0.0, 1.0, 0.01).name('Ambient');
+const shininessCtrl      = lightFolder.add(material.uniforms.shininess, 'value', 1.0, 128.0, 1.0).name('Shininess');
+
 
 gui.add(renderProps, 'invertColor').name('Invert color')
     .onChange(v => { material.uniforms.invertColor.value = v; });
@@ -221,6 +300,23 @@ rotFolder.add(renderProps.rotations, 'x').name('X');
 rotFolder.add(renderProps.rotations, 'y').name('Y');
 rotFolder.add(renderProps.rotations, 'z').name('Z');
 
+
+compCtrl.onChange(name => {
+    const id = compositions.find(c => c.name === name)?.id || 'MIP';
+    material.uniforms.composition.value =
+        id === 'MIP' ? COMP.MIP :
+            id === 'ISO' ? COMP.ISO :
+                id === 'EA'  ? COMP.EA  : COMP.AVG;
+
+    if (id === 'MIP' || id === 'AVG') {
+        renderProps.shading = 'None';
+        material.uniforms.shadingMode.value = SHADING.NONE;
+    }
+    material.needsUpdate = true;
+    updateUI();
+});
+
+updateUI();
 
 
 const tfFolder = gui.addFolder('Transfer Function');
@@ -261,6 +357,43 @@ const tf = new TransferFunctionEditor(tfHost, {
 });
 
 
+
+function updateUI() {
+    // resolve current composition
+    const compName = renderProps.composition;
+    const compId =
+        compName === 'Maximum Intensity'      ? COMP.MIP :
+            compName === 'First Hit'              ? COMP.ISO :
+                compName === 'Emission/Absorption'    ? COMP.EA  :
+                    COMP.AVG;
+
+    // resolve shading mode
+    const shadeId = shadingOptions.find(o => o.name === renderProps.shading)?.id ?? SHADING.NONE;
+
+
+    const isEA  = compId === COMP.EA;
+    const isISO = compId === COMP.ISO;
+    const isMIP = compId === COMP.MIP;
+    const isAVG = compId === COMP.AVG;
+
+    isEA ? densityCtrl.show() : densityCtrl.hide();
+
+
+    (isISO || isMIP || isAVG) ? alphaCtrl.show() : alphaCtrl.hide();
+
+    isISO ? isoCtrl.show() : isoCtrl.hide();
+
+    (isEA || isISO) ? shadingCtrl.show() : shadingCtrl.hide();
+
+
+    if ((isEA || isISO) && shadeId !== SHADING.NONE) {
+        gradientCtrl.show();
+        lightFolder.show();
+    } else {
+        gradientCtrl.hide();
+        lightFolder.hide();
+    }
+}
 function lerpAlpha(stops, x) {
     if (!stops || !stops.length) return 1.0;
     x = Math.min(1, Math.max(0, x));
@@ -323,22 +456,6 @@ function applyTransferFunction() {
 tf.addListener(applyTransferFunction);
 applyTransferFunction();
 
-// Hook up composition change
-compCtrl.onChange(name => {
-    const id = compositions.find(c => c.name === name)?.id || 'MIP';
-    material.uniforms.composition.value =
-        id === 'MIP' ? COMP.MIP :
-            id === 'ISO' ? COMP.ISO :
-                id === 'EA'  ? COMP.EA  : COMP.AVG;
-
-    material.needsUpdate = true;
-
-    // Visibility toggles
-    (id === 'ISO') ? isoCtrl.show()   : isoCtrl.hide();
-});
-
-// Set initial visibility
-isoCtrl.hide();
 
 // Rendering Loop
 function animate() {
