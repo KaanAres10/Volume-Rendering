@@ -491,16 +491,23 @@ await loadExample('Subclavia')
 async function loadExample(name) {
     if (!name) return;
 
-    const meta = await fetch(`/examples/${name}.meta.json`).then(r => {
-        if (!r.ok) throw new Error(`Could not load ${name}.meta.json`);
-        return r.json();
-    });
+    const base = import.meta.env.BASE_URL; // or just use "./examples/"
 
-    const buf = await fetch(`/examples/${name}.raw`).then(r => {
-        if (!r.ok) throw new Error(`Could not load ${name}.raw`);
-        return r.arrayBuffer();
-    });
+    const res = await fetch(`${base}examples/${name}.meta.json`);
+    const meta = await res.json();
 
+    const rawUrl = `${base}examples/${name}.raw`;
+    const bufRes = await fetch(rawUrl);
+
+    if (!bufRes.ok) {
+        throw new Error(`Could not load ${name}.raw (status ${bufRes.status})`);
+    }
+
+    const buf = await bufRes.arrayBuffer();
+
+    if (buf.byteLength === 0) {
+        throw new Error(`Loaded RAW but it was empty! Check if file exists at ${rawUrl}`);
+    }
     const typemap = {
         uint8: Uint8Array, int8: Int8Array,
         uint16: Uint16Array, int16: Int16Array,
@@ -563,12 +570,21 @@ document.getElementById('example-select')
 
 
 async function tryLoadConfigAndApply(name) {
-    const base = String(name).replace(/(\.nii(\.gz)?|\.raw|\.zip|\.json)$/i, '');
-    const url  = `/examples/${base}.config.json`;
-    const res  = await fetch(url, { cache: 'no-cache' });
-    if (!res.ok) return;
-    const cfg = await res.json();
-    applyExampleConfig(cfg);
+    const baseName = String(name).replace(/(\.nii(\.gz)?|\.raw|\.zip|\.json)$/i, '');
+    const baseUrl  = import.meta.env.BASE_URL;
+    const url      = `${baseUrl}examples/${baseName}.config.json`;
+
+    try {
+        const res = await fetch(url, { cache: 'no-cache' });
+        if (!res.ok) {
+            console.warn(`No config for ${baseName}, skipping.`);
+            return;
+        }
+        const cfg = await res.json();
+        applyExampleConfig(cfg);
+    } catch (err) {
+        console.error(`Error loading config for ${baseName}:`, err);
+    }
 }
 
 function applyExampleConfig(cfg = {}) {
