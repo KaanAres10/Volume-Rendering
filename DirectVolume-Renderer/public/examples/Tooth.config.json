@@ -1,0 +1,39 @@
+{
+  "tf": {
+    "colorMap": {
+      "colorStops": [
+        { "stop": 0.00, "color": "blue" },
+        { "stop": 0.50, "color": "white" },
+        { "stop": 1.00, "color": "yellow" }
+      ],
+      "interpolationMethod": "HSL",
+      "discrete": false,
+      "bins": 8
+    },
+    "alphaStops": [
+      { "stop": 0.00, "alpha": 0.00 },
+      { "stop": 0.20, "alpha": 0.80 },
+      { "stop": 0.35, "alpha": 0.00 },
+      { "stop": 0.45, "alpha": 0.00 },
+      { "stop": 0.50, "alpha": 0.00 },
+      { "stop": 0.60, "alpha": 0.00 },
+      { "stop": 0.72, "alpha": 0.80 },
+      { "stop": 1.00, "alpha": 0.00 }
+    ]
+  },
+  "render": {
+    "composition": "Emission/Absorption",
+    "samplingRate": 1.0,
+    "alphaScale": 1.0,
+    "threshold": 0.5,
+    "shading": "Blinn-Phong",
+    "gradient": "Central Difference",
+    "densityScale": 100,
+    "invertColor": true,
+    "rotations": { "x": false, "y": true, "z": false }
+  },
+  "camera": {
+    "position": [0, 0, -2.0],
+    "target":   [0, 0,  0]
+  }
+}

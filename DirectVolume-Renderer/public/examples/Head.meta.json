@@ -1,0 +1,6 @@
+{
+  "name": "Head (uint8)",
+  "type": "uint8",
+  "dims": [256, 256, 109],
+  "spacing": [1.0, 1.0, 1.40]
+}

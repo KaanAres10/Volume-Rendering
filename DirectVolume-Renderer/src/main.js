@@ -16,6 +16,8 @@ import { ColorMapEditor }   from './tfeditor_js/ColorMapEditor.js';
 import { ColorPicker }   from './tfeditor_js/ColorPicker.js';
 import {update} from "three/addons/libs/tween.module.js";
 
+import { loadVolumeFromFiles} from './file_loader/volume_loader.js';
+import {loadNifti} from "./file_loader/volume_loader.js"
 
 const COMP = { MIP:0, ISO:1, EA:2, AVG:3 };
 
@@ -58,33 +60,56 @@ const renderProps = {
     samplingRate: 1.0,
     threshold: 0.5,
     palette: 'Greys',
-    invertColor: true,
+    invertColor: false,
     alphaScale: 1.0,
     shading: 'None',
     gradient: 'Central Difference',
 };
 
-export async function loadUint8VolumeFromZip(url, dims) {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Fetch failed: ${res.status} ${res.statusText}`);
-    const blob = await res.blob();
+let renderer;
+let rafId;
 
-    const zip = await JSZip.loadAsync(blob);
+function initRenderer(container) {
+    if (renderer) return renderer;
 
-    // pick first file (Observable used zip.filenames[0])
-    const firstName = Object.keys(zip.files).find(n => !zip.files[n].dir);
-    if (!firstName) throw new Error('No file inside zip');
-    const inner = zip.file(firstName);
-    const data = await inner.async('uint8array'); // Uint8Array view
+    renderer = new THREE.WebGLRenderer({
+        antialias: false,
+        alpha: false,
+        depth: false,
+        stencil: false,
+        powerPreference: 'high-performance',
+        failIfMajorPerformanceCaveat: false,
+        preserveDrawingBuffer: false,
+    });
 
-    const expected = dims.x * dims.y * dims.z;
-    if (data.length !== expected) {
-        console.warn(`Size mismatch: got ${data.length}, expected ${expected}`);
-    }
-    return data;
+    renderer.setSize(800, 600);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+
+    container.appendChild(renderer.domElement);
+
+    renderer.domElement.addEventListener('webglcontextlost', (e) => {
+        e.preventDefault();
+        cancelAnimationFrame(rafId);
+        console.warn('WebGL context lost');
+    });
+
+    renderer.domElement.addEventListener('webglcontextrestored', () => {
+        console.warn('WebGL context restored');
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+        rafId = requestAnimationFrame(animate);
+    });
+
+    return renderer;
 }
 
-
+function setVolumeTexture(newTex) {
+    const oldTex = material.uniforms.dataTexture.value;
+    if (oldTex && oldTex !== newTex) {
+        try { oldTex.dispose(); } catch {}
+    }
+    material.uniforms.dataTexture.value = newTex;
+    material.uniforms.dataTexture.value.needsUpdate = true;
+}
 
 export function makeColorTexture(count = 256) {
     // Create a color scale based on the selected palette using chroma-js.
@@ -116,42 +141,16 @@ export function makeColorTexture(count = 256) {
     return texture;
 }
 
+function setBoxScale(dims, spacing) {
+    // physical size per axis
+    const Sx = dims.x * spacing[0];
+    const Sy = dims.y * spacing[1];
+    const Sz = dims.z * spacing[2];
 
-// Retrieving data
-const dataDescription = {
-    name: "Head",
-    acknowledgement: "Divine Augustine",
-    licence: "The Code Project Open License",
-    description: "CT scan of a human head",
-    link: "https://www.codeproject.com/Articles/352270/Getting-Started-with-Volume-Rendering-using-OpenGL",
-    dataType: "uint8",
-    scale: [-1, -1, 1 / 1.65],
-    xExtent: 256,
-    yExtent: 256,
-    zExtent: 109
-};
+    const m = Math.max(Sx, Sy, Sz) || 1;
 
-const dims = { x: dataDescription.xExtent, y: dataDescription.yExtent, z: dataDescription.zExtent };
-const dataValues = await loadUint8VolumeFromZip(
-  "https://kaanares10.github.io/Volume-Rendering/head_256x256x109.zip",
-  dims
-);
-console.log('Volume data loaded:');
-console.log('Type:', dataValues.constructor.name);
-console.log('Length:', dataValues.length);
-console.log('First 20 values:', dataValues.slice(0, 20));
-
-
-// Creating 3D Texture
-const volumeTexture= new THREE.Data3DTexture(dataValues, dataDescription.xExtent, dataDescription.yExtent, dataDescription.zExtent);
-volumeTexture.format = THREE.RedFormat;
-volumeTexture.type = THREE.UnsignedByteType;
-volumeTexture.minFilter = THREE.LinearFilter;
-volumeTexture.magFilter = THREE.LinearFilter;
-volumeTexture.wrapS = THREE.ClampToEdgeWrapping;
-volumeTexture.wrapT = THREE.ClampToEdgeWrapping;
-volumeTexture.wrapS = THREE.ClampToEdgeWrapping;
-volumeTexture.needsUpdate = true;
+    box.scale.set(-Sx / m, -Sy / m,  Sz / m);
+}
 
 // Creating Color Texture
 let colorTexture = makeColorTexture();
@@ -163,7 +162,6 @@ scene.background = new THREE.Color("#1f1f1f");
 const geometry = new THREE.BoxGeometry(1, 1, 1);
 
 const box = new THREE.Mesh(geometry);
-box.scale.set(dataDescription.scale[0], dataDescription.scale[1], dataDescription.scale[2]);
 
 const line = new THREE.LineSegments(
     new THREE.EdgesGeometry(geometry),
@@ -171,10 +169,18 @@ const line = new THREE.LineSegments(
 );
 box.add(line);
 
+
+const HEAD_SPACING = [1.0, 1.0, 1.40];
+setBoxScale(
+    { x: 256, y: 256, z: 109 },
+    HEAD_SPACING
+);
+
+
 const material = new THREE.RawShaderMaterial({
     glslVersion: THREE.GLSL3,
     uniforms: {
-        dataTexture: {value: volumeTexture},
+        dataTexture: {value: null},
         colorTexture: {value: colorTexture},
         cameraPosition: {value: new THREE.Vector3()},
         samplingRate: {value: renderProps.samplingRate},
@@ -219,15 +225,11 @@ const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
 camera.position.set(0, 0, -2);
 camera.lookAt(new THREE.Vector3(0, 0, 0));
 
-const renderer = new THREE.WebGLRenderer({antialias: true});
-renderer.setSize(width, height);
-renderer.setPixelRatio(devicePixelRatio);
-renderer.domElement.style.border = "1px solid black";
-
-document.getElementById("three-root").appendChild(renderer.domElement);
+initRenderer(document.getElementById("three-root"));
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.addEventListener("change", () => renderer.render(scene, camera));
+
 
 // GUI
 // Create GUI
@@ -280,7 +282,7 @@ const alphaCtrl = gui.add(renderProps, 'alphaScale', 0.0, 2.0, 0.0001)
     .onChange(v => material.uniforms.alphaScale.value = v);
 
 
-gui.add(renderProps, 'samplingRate', 0.1, 4.0, 0.1)
+const samplingCtrl= gui.add(renderProps, 'samplingRate', 0.1, 4.0, 0.1)
     .name('Sampling rate')
     .onChange(v => material.uniforms.samplingRate.value = v);
 
@@ -292,13 +294,13 @@ const ambientCtrl        = lightFolder.add(material.uniforms.ambient, 'value', 0
 const shininessCtrl      = lightFolder.add(material.uniforms.shininess, 'value', 1.0, 128.0, 1.0).name('Shininess');
 
 
-gui.add(renderProps, 'invertColor').name('Invert color')
+const invertCtrl = gui.add(renderProps, 'invertColor').name('Invert color')
     .onChange(v => { material.uniforms.invertColor.value = v; });
 const rotFolder = gui.addFolder('Rotation');
 
-rotFolder.add(renderProps.rotations, 'x').name('X');
-rotFolder.add(renderProps.rotations, 'y').name('Y');
-rotFolder.add(renderProps.rotations, 'z').name('Z');
+const rotXCtrl= rotFolder.add(renderProps.rotations, 'x').name('X');
+const rotYCtrl = rotFolder.add(renderProps.rotations, 'y').name('Y');
+const rotZCtrl = rotFolder.add(renderProps.rotations, 'z').name('Z');
 
 
 compCtrl.onChange(name => {
@@ -356,7 +358,34 @@ const tf = new TransferFunctionEditor(tfHost, {
     }
 });
 
+const fileInput = document.getElementById('volume-input');
+if (fileInput) {
+    fileInput.addEventListener('change', async (e) => {
+        try {
+            const vol = await loadVolumeFromFiles(e.target.files);
+            const volumeTexture = new THREE.Data3DTexture(vol.data, vol.dims.x, vol.dims.y, vol.dims.z);
+            volumeTexture.format = THREE.RedFormat;
+            volumeTexture.type = THREE.UnsignedByteType;
+            volumeTexture.minFilter = THREE.LinearFilter;
+            volumeTexture.magFilter = THREE.LinearFilter;
+            volumeTexture.wrapS = volumeTexture.wrapT = volumeTexture.wrapR = THREE.ClampToEdgeWrapping;
+            volumeTexture.needsUpdate = true;
 
+            setVolumeTexture(volumeTexture);
+
+            const [sx, sy, sz] = vol.spacing || [1,1,1];
+            setBoxScale(vol.dims, [sx, sy, sz]);
+
+            renderProps.composition = 'Emission/Absorption';
+            material.uniforms.composition.value = COMP.EA;
+            material.needsUpdate = true;
+            renderer.render(scene, camera);
+        } catch (err) {
+            console.error(err);
+            alert(err.message || String(err));
+        }
+    });
+}
 
 function updateUI() {
     // resolve current composition
@@ -457,6 +486,194 @@ tf.addListener(applyTransferFunction);
 applyTransferFunction();
 
 
+await loadExample('Subclavia')
+
+async function loadExample(name) {
+    if (!name) return;
+
+    const meta = await fetch(`/examples/${name}.meta.json`).then(r => {
+        if (!r.ok) throw new Error(`Could not load ${name}.meta.json`);
+        return r.json();
+    });
+
+    const buf = await fetch(`/examples/${name}.raw`).then(r => {
+        if (!r.ok) throw new Error(`Could not load ${name}.raw`);
+        return r.arrayBuffer();
+    });
+
+    const typemap = {
+        uint8: Uint8Array, int8: Int8Array,
+        uint16: Uint16Array, int16: Int16Array,
+        float32: Float32Array, float64: Float64Array
+    };
+    const Typed = typemap[(meta.type || 'uint8').toLowerCase()] || Uint8Array;
+
+    // reinterpret the buffer as the correct type
+    const typed = new Typed(buf);
+
+    // sanity check: length matches dims
+    const voxCount = meta.dims[0] * meta.dims[1] * meta.dims[2];
+    if (typed.length < voxCount) {
+        throw new Error(`RAW too small: ${typed.length} < ${voxCount}`);
+    }
+
+    // normalize to Uint8 if needed (no spread!)
+    let voxels;
+    if (Typed === Uint8Array) {
+        // slice to exact voxCount in case of padding
+        voxels = typed.length === voxCount ? typed : typed.subarray(0, voxCount);
+    } else {
+        // pass 1: min/max
+        let min = Infinity, max = -Infinity;
+        for (let i = 0; i < voxCount; i++) {
+            const v = typed[i];
+            if (v < min) min = v;
+            if (v > max) max = v;
+        }
+        const range = max - min || 1;
+
+        // pass 2: scale to 0..255
+        voxels = new Uint8Array(voxCount);
+        for (let i = 0; i < voxCount; i++) {
+            voxels[i] = Math.round(255 * (typed[i] - min) / range);
+        }
+    }
+
+    const tex = new THREE.Data3DTexture(
+        voxels,
+        meta.dims[0], meta.dims[1], meta.dims[2]
+    );
+    tex.format = THREE.RedFormat;
+    tex.type   = THREE.UnsignedByteType;
+    tex.minFilter = tex.magFilter = THREE.LinearFilter;
+    tex.wrapS = tex.wrapT = tex.wrapR = THREE.ClampToEdgeWrapping;
+    tex.needsUpdate = true;
+
+    setVolumeTexture(tex);
+
+    const spacing = meta.spacing || [1,1,1];
+    setBoxScale({ x: meta.dims[0], y: meta.dims[1], z: meta.dims[2] }, spacing);
+
+    await tryLoadConfigAndApply(name);
+    renderer.render(scene, camera);
+}
+
+document.getElementById('example-select')
+    .addEventListener('change', e => loadExample(e.target.value));
+
+
+async function tryLoadConfigAndApply(name) {
+    const base = String(name).replace(/(\.nii(\.gz)?|\.raw|\.zip|\.json)$/i, '');
+    const url  = `/examples/${base}.config.json`;
+    const res  = await fetch(url, { cache: 'no-cache' });
+    if (!res.ok) return;
+    const cfg = await res.json();
+    applyExampleConfig(cfg);
+}
+
+function applyExampleConfig(cfg = {}) {
+    // Transfer Function
+    if (cfg.tf) {
+        let appliedViaEditor = false;
+
+        if (typeof tf?.setTransferFunction === 'function') {
+            try {
+                tf.setTransferFunction({
+                    colorMap:   cfg.tf.colorMap,
+                    alphaStops: cfg.tf.alphaStops || []
+                });
+                applyTransferFunction();
+                appliedViaEditor = true;
+            } catch (e) {
+                console.warn('TF editor rejected preset, falling back to direct LUT', e);
+            }
+        }
+
+        // Fallback: build LUT directly from config and push to shader
+        if (!appliedViaEditor) {
+            const alphaScale =
+                (cfg.render && typeof cfg.render.alphaScale === 'number')
+                    ? cfg.render.alphaScale
+                    : renderProps.alphaScale;
+
+            const tex = makeTFTextureFromEditor(
+                { colorMap: cfg.tf.colorMap, alphaStops: cfg.tf.alphaStops || [] },
+                256,
+                alphaScale
+            );
+            colorTexture = tex;
+            material.uniforms.colorTexture.value = tex;
+            material.uniforms.colorTexture.value.needsUpdate = true;
+        }
+    }
+
+    // Render
+    if (cfg.render) {
+        if (cfg.render.composition) {
+            compCtrl?.setValue(cfg.render.composition);
+        }
+        if (cfg.render.shading) {
+            shadingCtrl?.setValue(cfg.render.shading);
+        }
+
+        if (cfg.render.gradient) {
+            gradientCtrl?.setValue(cfg.render.gradient);
+        }
+
+        if (typeof cfg.render.samplingRate === 'number') {
+            samplingCtrl?.setValue(cfg.render.samplingRate);
+            material.uniforms.samplingRate.value = cfg.render.samplingRate;
+        }
+        if (typeof cfg.render.alphaScale === 'number') {
+            alphaCtrl?.setValue(cfg.render.alphaScale);
+            material.uniforms.alphaScale.value = cfg.render.alphaScale;
+        }
+        if (typeof cfg.render.threshold === 'number') {
+            isoCtrl?.setValue(cfg.render.threshold);
+            material.uniforms.threshold.value = cfg.render.threshold;
+        }
+        if (typeof cfg.render.invertColor === 'boolean') {
+            invertCtrl?.setValue(cfg.render.invertColor);
+            material.uniforms.invertColor.value = cfg.render.invertColor; // bool
+        }
+        if (typeof cfg.render.densityScale === 'number') {
+            densityCtrl?.setValue(cfg.render.densityScale);
+            material.uniforms.densityScale.value = cfg.render.densityScale;
+        }
+        if (cfg.render.rotations) {
+            if ('x' in cfg.render.rotations) rotXCtrl?.setValue(!!cfg.render.rotations.x);
+            if ('y' in cfg.render.rotations) rotYCtrl?.setValue(!!cfg.render.rotations.y);
+            if ('z' in cfg.render.rotations) rotZCtrl?.setValue(!!cfg.render.rotations.z);
+        }
+
+        // Lighting
+        if (cfg.render?.lighting) {
+            const L = cfg.render.lighting;
+            if (typeof L.intensity === 'number') {
+                material.uniforms.lightIntensity.value = L.intensity;
+            }
+            if (typeof L.ambient === 'number') {
+                material.uniforms.ambient.value = L.ambient;
+            }
+            if (typeof L.shininess === 'number') {
+                material.uniforms.shininess.value = L.shininess;
+            }
+            if (typeof L.enabled === 'boolean' && material.uniforms.enableLighting) {
+                material.uniforms.enableLighting.value = L.enabled;
+            }
+        }
+
+        if (cfg.render?.lighting) {
+            const L = cfg.render.lighting;
+            if (typeof L.intensity === 'number') lightIntensityCtrl.setValue(L.intensity);
+            if (typeof L.ambient   === 'number') ambientCtrl.setValue(L.ambient);
+            if (typeof L.shininess === 'number') shininessCtrl.setValue(L.shininess);
+        }
+
+    }
+    updateUI();
+    renderer.render(scene, camera);
+}
 // Rendering Loop
 function animate() {
     if (material) {
@@ -472,6 +689,6 @@ function animate() {
     controls.update?.();
 
     renderer.render(scene, camera);
-    requestAnimationFrame(animate);
+    rafId = requestAnimationFrame(animate);
 }
-requestAnimationFrame(animate);
+rafId = requestAnimationFrame(animate);

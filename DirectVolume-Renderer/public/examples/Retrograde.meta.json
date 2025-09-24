@@ -1,0 +1,6 @@
+{
+  "dims": [320, 320, 72],
+  "spacing": [1.25, 1.25, 1.85],
+  "type": "uint16",
+  "description": "Retrograde dataset (16-bit volume)."
+}

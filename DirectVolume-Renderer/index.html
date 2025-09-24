@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8" />
-    <title>Direct Volume Renderer + Transfer Function</title>
+    <title>Direct Volume Renderer</title>
     <style>
         /* Layout */
         html, body { height: 100%; margin: 0; font-family: Arial, Helvetica, sans-serif; }
@@ -17,7 +17,7 @@
             background: #111;
         }
 
-        /* Right: sidebar with GUI (top) and TF (bottom) */
+        /* Right: sidebar with GUI (top) */
         #sidebar {
             width: 420px;
             max-width: 40vw;
@@ -28,32 +28,67 @@
             display: flex;
             flex-direction: column;
             gap: 14px;
-            color: #f3f4f6;            /* light text for dark bg */
+            color: #f3f4f6;
         }
 
         /* Let lil-gui expand full width inside our mount */
         #gui-mount .lil-gui { width: 100% !important; max-width: none !important; }
 
-
-        /* TF panel — themed to match sidebar */
-        #tf-panel {
-            background: #111111;       /* match sidebar */
-            border: 1px solid #2a2a2a; /* subtle border */
+        /* Loader card */
+        .card {
+            background: #111111;
+            border: 1px solid #2a2a2a;
             border-radius: 10px;
             padding: 12px;
-            color: inherit;
         }
-        #tf-panel h2 {
+        .card h2 {
             margin: 0 0 10px;
             font-weight: 600;
             color: #ffffff;
+            font-size: 16px;
         }
 
-        /* Editor area */
-        #tf-editor { width: 100%; height: 220px; }
+        /* Drop zone */
+        #drop-zone {
+            border: 1px dashed #3a3a3a;
+            border-radius: 8px;
+            padding: 14px;
+            text-align: center;
+            color: #cbd5e1;
+            background: #0f0f0f;
+            transition: border-color 0.2s ease, background 0.2s ease;
+            user-select: none;
+        }
+        #drop-zone.dragover {
+            border-color: #60a5fa;
+            background: #0b1220;
+        }
 
-        /* Keep these for your project */
-        .tfe-transparency-editor { height: 200px; border: 1px solid #eaeaea; }
+        /* Buttons row */
+        .row {
+            display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap;
+        }
+        .btn {
+            appearance: none;
+            border: 1px solid #2a2a2a;
+            background: #1a1a1a;
+            color: #e5e7eb;
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .btn:hover { background: #222; }
+
+        /* Hidden file input but still accessible via label */
+        .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+        label.file-label { cursor: pointer; }
+
+        /* TF panel styles */
+        #tf-panel { background: #111111; border: 1px solid #2a2a2a; border-radius: 10px; padding: 12px; color: inherit; }
+        #tf-panel h2 { margin: 0 0 10px; font-weight: 600; color: #ffffff; }
+        #tf-editor { width: 100%; height: 220px; }
+        .tfe-transparency-editor { height: 200px; border: 1px solid #1f1f1f; }
         .tfe-color-map-editor   { margin-top: 10px; height: 40px; border: 1px solid #1f1f1f; }
     </style>
 </head>
@@ -62,13 +97,89 @@
     <div id="three-root"></div>
 
     <aside id="sidebar">
+
+        <!-- File loader -->
+        <section class="card">
+            <h2>Load Data</h2>
+
+            <div id="drop-zone">
+                Drop files here<br/>
+                <small>(.nii, .nii.gz, .raw + .json)</small>
+            </div>
+
+            <div class="row">
+                <!-- Examples dropdown styled like a button -->
+                <select id="example-select" class="btn picker">
+                    <option value="">Choose Examples</option>
+                    <option value="Orange">Orange</option>
+                    <option value="pat38_cropped_seg">Hearth</option>
+                    <option value="Head">Head</option>
+                    <option value="Subclavia">Subclavia</option>
+                    <option value="Retrograde">Retrograde</option>
+                    <option value="Tooth">Tooth</option>
+                </select>
+
+                <!-- Hidden file input, label acts as the button -->
+                <input
+                        id="volume-input"
+                        class="sr-only"
+                        type="file"
+                        multiple
+                        accept=".nii,.nii.gz,.nrrd,.nhdr,.mhd,.mha,.raw,.zip,.dcm,.dicom,.pvm,.vol.gz,.raw.gz" />
+                <label for="volume-input" class="btn file-label">Browse…</label>
+            </div>
+        </section>
+
+        <!-- Your lil-gui mounts here -->
         <div id="gui-mount"></div>
-
-
     </aside>
 </div>
 
 <!-- Your renderer + TF init -->
 <script type="module" src="/src/main.js"></script>
+
+<!-- Simple drag-and-drop hookup (optional — remove if you do this in main.js) -->
+<script>
+    // This small block only sets up the drop highlight and forwards dropped files
+    // to the existing #volume-input change handler, if you already attach one in main.js.
+    const dz = document.getElementById('drop-zone');
+    const fi = document.getElementById('volume-input');
+
+    ['dragenter','dragover'].forEach(evt =>
+        dz.addEventListener(evt, e => {
+            e.preventDefault(); e.stopPropagation();
+            dz.classList.add('dragover');
+        })
+    );
+    ['dragleave','drop'].forEach(evt =>
+        dz.addEventListener(evt, e => {
+            e.preventDefault(); e.stopPropagation();
+            dz.classList.remove('dragover');
+        })
+    );
+    dz.addEventListener('drop', e => {
+        if (!fi) return;
+        // Create a DataTransfer to reuse your change handler
+        const dt = new DataTransfer();
+        for (const f of e.dataTransfer.files) dt.items.add(f);
+        fi.files = dt.files;
+        // Trigger the same flow as manual selection; your main.js listener will run.
+        const ev = new Event('change', { bubbles: true });
+        fi.dispatchEvent(ev);
+    });
+
+    // Optional sample button; hook however you like in main.js
+    document.getElementById('load-sample')?.addEventListener('click', () => {
+        // e.g., fetch a known sample or call a function you expose in main.js
+        // window.loadSampleHead?.();
+        const evt = new CustomEvent('load-sample-head');
+        window.dispatchEvent(evt);
+    });
+
+    document.getElementById('clear-volume')?.addEventListener('click', () => {
+        const evt = new CustomEvent('clear-volume');
+        window.dispatchEvent(evt);
+    });
+</script>
 </body>
 </html>

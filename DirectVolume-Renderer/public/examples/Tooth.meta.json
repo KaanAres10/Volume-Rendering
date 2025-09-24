@@ -1,0 +1,6 @@
+{
+  "dims": [256, 256, 161],
+  "spacing": [1.0, 1.0, 1.0],
+  "type": "uint16",
+  "description": "Micro CT scan of a tooth (IEEE Vis 2000 Transfer Function Bakeoff dataset)"
+}

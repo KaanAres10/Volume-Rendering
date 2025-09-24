@@ -122,10 +122,21 @@ export class TransferFunctionEditor {
     }
     /** Set a new color map. */
     setColorMap(colorMap) {
-        this.colorMapEditor.setColorStops(colorMap);
+        this.colorMapEditor.setColorMap(colorMap);
     }
     /** Returns the complete transfer function including the alpha values and the color map. */
     getTransferFunction() {
         return this.transparencyEditor.getTransferFunction();
+    }
+
+    setTransferFunction(tf) {
+        if (tf?.colorMap) {
+            this.colorMapEditor.setColorMap(tf.colorMap);
+        }
+        if (Array.isArray(tf?.alphaStops)) {
+            this.transparencyEditor.setAlphaStops(tf.alphaStops);
+        }
+        // notify listeners that the TF changed
+        this.callbacks.forEach(cb => cb(this));
     }
 }

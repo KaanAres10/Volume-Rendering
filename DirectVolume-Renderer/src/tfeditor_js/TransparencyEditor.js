@@ -77,6 +77,11 @@ export class TransparencyEditor extends Container {
         this.draw();
         this.addEventListeners();
     }
+
+    setStops(alphaStops) {
+        this.setAlphaStops(alphaStops);
+    }
+
     /**
      * Register a callback that gets called, when the transfer function changes. The callback gets called once
      * immediately.
