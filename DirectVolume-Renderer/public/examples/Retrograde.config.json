@@ -23,7 +23,7 @@
     "composition": "Maximum Intensity",
     "alphaScale": 1.0,
     "samplingRate": 1.0,
-    "invertColor": true,
+    "invertColor": false,
     "rotations": { "x": false, "y": true, "z": false }
   },
   "camera": {
