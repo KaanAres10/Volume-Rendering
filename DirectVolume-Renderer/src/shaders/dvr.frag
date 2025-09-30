@@ -30,13 +30,10 @@ const int GRADIENT_SOBEL   = 1;
 
 uniform float densityScale;
 
-
 in vec3 vOrigin;
 in vec3 vDirection;
 
 out vec4 frag_color;
-
-
 
 float sampleData(vec3 coord) {
     return texture(dataTexture, coord).x;
@@ -65,44 +62,57 @@ vec3 voxelSizeTex() {
     return 1.0 / (dims - vec3(1.0));
 }
 
-// Central difference (already implemented)
-vec3 gradientCentral(vec3 tc) {
+// Central difference
+vec3 gradientCentral(vec3 textureCoord) {
     vec3 h = voxelSizeTex();
-    float dx = sampleData(tc + vec3(h.x,0,0)) - sampleData(tc - vec3(h.x,0,0));
-    float dy = sampleData(tc + vec3(0,h.y,0)) - sampleData(tc - vec3(0,h.y,0));
-    float dz = sampleData(tc + vec3(0,0,h.z)) - sampleData(tc - vec3(0,0,h.z));
+    float dx = sampleData(textureCoord + vec3(h.x,0,0)) - sampleData(textureCoord - vec3(h.x,0,0));
+    float dy = sampleData(textureCoord + vec3(0,h.y,0)) - sampleData(textureCoord - vec3(0,h.y,0));
+    float dz = sampleData(textureCoord + vec3(0,0,h.z)) - sampleData(textureCoord - vec3(0,0,h.z));
     return vec3(dx, dy, dz);
 }
 
-// Sobel operator in 3D (costlier, stronger edges)
-vec3 gradientSobel(vec3 tc) {
+// Sobel operator
+vec3 gradientSobel(vec3 textureCoord) {
     vec3 h = voxelSizeTex();
+
+    const float k[3] = float[3](-1.0, 0.0, 1.0);  // derivative
+    const float s[3] = float[3]( 1.0, 2.0, 1.0);  // smoothing
+
     float Gx = 0.0;
     float Gy = 0.0;
     float Gz = 0.0;
 
-    for (int dz = -1; dz <= 1; dz++) {
-        for (int dy = -1; dy <= 1; dy++) {
-            for (int dx = -1; dx <= 1; dx++) {
-                float wX = float(dx) * (dx != 0 ? 2.0 : 1.0);
-                float wY = float(dy) * (dy != 0 ? 2.0 : 1.0);
-                float wZ = float(dz) * (dz != 0 ? 2.0 : 1.0);
-                float sampled = sampleData(tc + vec3(dx,dy,dz)*h);
+    for (int dz = -1; dz <= 1; ++dz) {
+        int indexZ = dz + 1;
+        for (int dy = -1; dy <= 1; ++dy) {
+            int indexY = dy + 1;
+            for (int dx = -1; dx <= 1; ++dx) {
+                int indexX = dx + 1;
 
-                Gx += wX * sampled;
-                Gy += wY * sampled;
-                Gz += wZ * sampled;
+                vec3 offset = vec3(dx, dy, dz) * h;
+                float v = sampleData(textureCoord + offset);
+
+                // separable Sobel weights
+                float wx = k[indexX] * s[indexY] * s[indexZ];
+                float wy = s[indexX] * k[indexY] * s[indexZ];
+                float wz = s[indexX] * s[indexY] * k[indexZ];
+
+                Gx += wx * v;
+                Gy += wy * v;
+                Gz += wz * v;
             }
         }
     }
-    return vec3(Gx, Gy, Gz);
+
+    const float NORM = 1.0 / 16.0;
+    return vec3(Gx, Gy, Gz) * NORM;
 }
 
-vec3 gradientAt(vec3 tc) {
+vec3 gradientAt(vec3 textureCoord) {
     if (gradientMode == GRADIENT_SOBEL) {
-        return gradientSobel(tc);
+        return gradientSobel(textureCoord);
     } else {
-        return gradientCentral(tc);
+        return gradientCentral(textureCoord);
     }
 }
 

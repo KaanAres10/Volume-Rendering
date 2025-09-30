@@ -2,25 +2,13 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import VERT from './shaders/dvr.vert?raw';
 import FRAG from './shaders/dvr.frag?raw';
-
-import JSZip from 'jszip';
 import chroma from 'chroma-js';
-
 import GUI from 'lil-gui';
 
-import * as d3 from 'd3';
-
 import { TransferFunctionEditor }   from './tfeditor_js/TransferFunctionEditor.js';
-import { TransparencyEditor }   from './tfeditor_js/TransparencyEditor.js';
-import { ColorMapEditor }   from './tfeditor_js/ColorMapEditor.js';
-import { ColorPicker }   from './tfeditor_js/ColorPicker.js';
-import {update} from "three/addons/libs/tween.module.js";
-
 import { loadVolumeFromFiles} from './file_loader/volume_loader.js';
-import {loadNifti} from "./file_loader/volume_loader.js"
 
 const COMP = { MIP:0, ISO:1, EA:2, AVG:3 };
-
 
 const compositions = [
     { name: 'Maximum Intensity', id: 'MIP' },
@@ -112,7 +100,6 @@ function setVolumeTexture(newTex) {
 }
 
 export function makeColorTexture(count = 256) {
-    // Create a color scale based on the selected palette using chroma-js.
     const scale = chroma.scale(renderProps.palette);
 
     // Create an array to hold the color values.
@@ -168,14 +155,6 @@ const line = new THREE.LineSegments(
     new THREE.LineBasicMaterial({color: 0x999999})
 );
 box.add(line);
-
-
-const HEAD_SPACING = [1.0, 1.0, 1.40];
-setBoxScale(
-    { x: 256, y: 256, z: 109 },
-    HEAD_SPACING
-);
-
 
 const material = new THREE.RawShaderMaterial({
     glslVersion: THREE.GLSL3,
@@ -491,7 +470,7 @@ await loadExample('Subclavia')
 async function loadExample(name) {
     if (!name) return;
 
-    const base = import.meta.env.BASE_URL; // or just use "./examples/"
+    const base = import.meta.env.BASE_URL;
 
     const res = await fetch(`${base}examples/${name}.meta.json`);
     const meta = await res.json();
@@ -515,22 +494,18 @@ async function loadExample(name) {
     };
     const Typed = typemap[(meta.type || 'uint8').toLowerCase()] || Uint8Array;
 
-    // reinterpret the buffer as the correct type
     const typed = new Typed(buf);
 
-    // sanity check: length matches dims
     const voxCount = meta.dims[0] * meta.dims[1] * meta.dims[2];
     if (typed.length < voxCount) {
         throw new Error(`RAW too small: ${typed.length} < ${voxCount}`);
     }
 
-    // normalize to Uint8 if needed (no spread!)
     let voxels;
     if (Typed === Uint8Array) {
         // slice to exact voxCount in case of padding
         voxels = typed.length === voxCount ? typed : typed.subarray(0, voxCount);
     } else {
-        // pass 1: min/max
         let min = Infinity, max = -Infinity;
         for (let i = 0; i < voxCount; i++) {
             const v = typed[i];
@@ -539,7 +514,6 @@ async function loadExample(name) {
         }
         const range = max - min || 1;
 
-        // pass 2: scale to 0..255
         voxels = new Uint8Array(voxCount);
         for (let i = 0; i < voxCount; i++) {
             voxels[i] = Math.round(255 * (typed[i] - min) / range);
