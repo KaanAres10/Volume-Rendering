@@ -148,6 +148,7 @@ button:focus-visible {
 
 #fallback-overlay h1 { margin: 0 0 8px; font-size: 1.8rem; }
 #fallback-overlay .why { margin: 0 0 14px; opacity: .95; }
+
 #fallback-overlay .tip { opacity: .8; font-size: 12px; margin-top: 12px; }
 
 body.fallback-active #app,

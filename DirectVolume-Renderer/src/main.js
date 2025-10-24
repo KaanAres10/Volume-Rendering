@@ -77,9 +77,10 @@ function showFallback(reason = 'WebGL is not supported or failed to initialize.'
         throw new Error('No WebGL2RenderingContext');
     }
     const testCanvas = document.createElement('canvas');
-    const gl = testCanvas.getContext('webgl2', { failIfMajorPerformanceCaveat: true });
+    const gl = testCanvas.getContext('webgl2');
     if (!gl) {
-        showFallback('WebGL2 context could not be created (graphics driver or browser limitation).');
+        showFallback('WebGL2 context could not be created (graphics driver or browser limitation).' +
+            'Try to refresh the page.');
         throw new Error('WebGL2 context creation failed');
     }
 })();
