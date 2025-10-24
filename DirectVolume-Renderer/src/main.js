@@ -59,25 +59,16 @@ let rafId;
 
 
 function showFallback(reason = 'WebGL is not supported or failed to initialize.') {
-    const fb = document.getElementById('fallback');
-    if (!fb) return;
-    fb.hidden = false;
-    const why = fb.querySelector('.why');
+    const overlay = document.getElementById('fallback-overlay');
+    if (!overlay) return;
+
+    document.body.classList.add('fallback-active');
+    overlay.hidden = false;
+
+    const why = overlay.querySelector('.why');
     if (why) why.textContent = reason;
 
-    // Try to fetch README
-    fetch('https://raw.githubusercontent.com/KaanAres10/Volume-Rendering/main/README.md', { cache: 'no-cache' })
-        .then(r => r.ok ? r.text() : '')
-        .then(txt => {
-            const pre = fb.querySelector('.readme');
-            if (pre && txt) pre.textContent = txt;
-        })
-        .catch(() => {});
-
-    const threeRoot = document.getElementById('three-root');
-    const sidebar  = document.getElementById('sidebar');
-    if (threeRoot) threeRoot.style.display = 'none';
-    if (sidebar)   sidebar.style.display   = 'block';
+    try { if (rafId) cancelAnimationFrame(rafId); } catch {}
 }
 
 (function guardWebGL() {

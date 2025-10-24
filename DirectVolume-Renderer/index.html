@@ -93,6 +93,22 @@
     </style>
 </head>
 <body>
+<section id="fallback-overlay" hidden aria-live="polite" aria-label="Viewer fallback">
+    <div class="fallback-content" role="dialog" aria-modal="true">
+        <h1>Browser Not Supported</h1>
+        <p class="why"></p>
+
+        <p>
+            You can still read about the project here:<br />
+            • <a href="https://github.com/KaanAres10/Volume-Rendering#readme" target="_blank" rel="noopener">GitHub Repository</a>
+        </p>
+
+        <p class="tip">Tip: try a desktop Chrome/Firefox with WebGL2 enabled, or update graphics drivers.</p>
+    </div>
+</section>
+
+
+
 <div id="app">
     <div id="three-root"></div>
 
@@ -108,7 +124,6 @@
             </div>
 
             <div class="row">
-                <!-- Examples dropdown styled like a button -->
                 <select id="example-select" class="btn picker">
                     <option value="">Choose Examples</option>
                     <option value="Orange">Orange</option>
@@ -131,41 +146,14 @@
         </section>
 
 
-
-        // Fallback
-        <section id="fallback" class="card" hidden>
-            <h2>Viewer unavailable</h2>
-            <p class="why" style="margin-top:0.25rem;"></p>
-
-            <p>
-                You can still read about the project here:
-                <br />
-                • <a href="https://github.com/KaanAres10/Volume-Rendering#readme" target="_blank" rel="noopener">GitHub README</a><br />
-                • <a href="https://kaanares10.github.io/Volume-Rendering/" target="_blank" rel="noopener">Project Website</a>
-            </p>
-
-            <details>
-                <summary>Show README</summary>
-                <pre class="readme" style="white-space:pre-wrap; overflow:auto; max-height:50vh; background:#0f0f0f; border:1px solid #2a2a2a; padding:10px;"></pre>
-            </details>
-
-            <p style="opacity:.8; font-size:12px; margin-top:10px;">
-                Tip: try a desktop Chrome/Firefox with WebGL2 enabled, or update graphics drivers.
-            </p>
-        </section>
-
-        <!-- Your lil-gui mounts here -->
         <div id="gui-mount"></div>
     </aside>
 </div>
 
-<!-- Your renderer + TF init -->
 <script type="module" src="/src/main.js"></script>
 
-<!-- Simple drag-and-drop hookup (optional — remove if you do this in main.js) -->
+<!-- Simple drag-and-drop hookup -->
 <script>
-    // This small block only sets up the drop highlight and forwards dropped files
-    // to the existing #volume-input change handler, if you already attach one in main.js.
     const dz = document.getElementById('drop-zone');
     const fi = document.getElementById('volume-input');
 
@@ -183,7 +171,6 @@
     );
     dz.addEventListener('drop', e => {
         if (!fi) return;
-        // Create a DataTransfer to reuse your change handler
         const dt = new DataTransfer();
         for (const f of e.dataTransfer.files) dt.items.add(f);
         fi.files = dt.files;
@@ -192,10 +179,7 @@
         fi.dispatchEvent(ev);
     });
 
-    // Optional sample button; hook however you like in main.js
-    document.getElementById('load-sample')?.addEventListener('click', () => {
-        // e.g., fetch a known sample or call a function you expose in main.js
-        // window.loadSampleHead?.();
+    document.getElementById('load-sample')?.addEventListener('click', () => {;
         const evt = new CustomEvent('load-sample-head');
         window.dispatchEvent(evt);
     });
@@ -205,5 +189,7 @@
         window.dispatchEvent(evt);
     });
 </script>
+
+
 </body>
 </html>

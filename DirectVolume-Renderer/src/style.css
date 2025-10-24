@@ -121,3 +121,43 @@ button:focus-visible {
     background-repeat: no-repeat;
     padding-right: 28px;
 }
+
+
+#fallback-overlay[hidden] { display: none !important; }
+#fallback-overlay {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 2147483647;
+    background: #0b0b0b;
+    color: #e6e6e6;
+    overflow: auto;
+    pointer-events: auto;
+}
+
+#fallback-overlay .fallback-content {
+    max-width: 900px;
+    margin: 8vh auto;
+    padding: 28px 24px;
+    background: #131313;
+    border: 1px solid #2a2a2a;
+    border-radius: 12px;
+    line-height: 1.5;
+}
+
+#fallback-overlay h1 { margin: 0 0 8px; font-size: 1.8rem; }
+#fallback-overlay .why { margin: 0 0 14px; opacity: .95; }
+#fallback-overlay .tip { opacity: .8; font-size: 12px; margin-top: 12px; }
+
+body.fallback-active #app,
+body.fallback-active header,
+body.fallback-active footer,
+body.fallback-active .lil-gui,
+body.fallback-active #gui-mount,
+body.fallback-active #example-select,
+body.fallback-active #volume-input {
+    display: none !important;
+}
+
+body.fallback-active { overflow: hidden; }
