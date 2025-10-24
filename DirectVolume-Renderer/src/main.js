@@ -66,7 +66,15 @@ function showFallback(reason = 'WebGL is not supported or failed to initialize.'
     overlay.hidden = false;
 
     const why = overlay.querySelector('.why');
-    if (why) why.textContent = reason;
+    if (why) {
+        why.style.whiteSpace = 'pre-line';
+        why.textContent = reason +
+            '\n\nPossible fixes:' +
+            '\n• Restart your browser' +
+            '\n• Close all other tabs using WebGL' +
+            '\n• Try a different browser (e.g., Chrome, Firefox).' +
+            '\n• Update your graphics driver.'
+    }
 
     try { if (rafId) cancelAnimationFrame(rafId); } catch {}
 }
@@ -84,6 +92,17 @@ function showFallback(reason = 'WebGL is not supported or failed to initialize.'
         throw new Error('WebGL2 context creation failed');
     }
 })();
+
+function hideFallback() {
+    const overlay = document.getElementById('fallback-overlay');
+    if (!overlay) return;
+
+    overlay.hidden = true;
+    document.body.classList.remove('fallback-active');
+
+    const why = overlay.querySelector('.why');
+    if (why) why.textContent = '';
+}
 
 function initRenderer(container) {
     if (renderer) return renderer;
@@ -104,14 +123,15 @@ function initRenderer(container) {
     container.appendChild(renderer.domElement);
 
     renderer.domElement.addEventListener('webglcontextlost', (e) => {
-        e.preventDefault();
+        e.preventDefault();                 // allow automatic restoration
         cancelAnimationFrame(rafId);
         console.warn('WebGL context lost');
-        showFallback('WebGL context was lost (the GPU/browser disabled the context).');
+        showFallback('WebGL context was lost (the GPU/browser disabled the context).\n\nTry to refresh the page.');
     });
 
     renderer.domElement.addEventListener('webglcontextrestored', () => {
         console.warn('WebGL context restored');
+        hideFallback();
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
         rafId = requestAnimationFrame(animate);
     });
