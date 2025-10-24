@@ -58,7 +58,7 @@ let renderer;
 let rafId;
 
 
-function showFallback(reason = 'WebGL is not supported or failed to initialize.') {
+function showFallback(reason = 'WebGL is not supported or failed to initialize.',   { noWebGL = false } = {}) {
     const overlay = document.getElementById('fallback-overlay');
     if (!overlay) return;
 
@@ -68,20 +68,34 @@ function showFallback(reason = 'WebGL is not supported or failed to initialize.'
     const why = overlay.querySelector('.why');
     if (why) {
         why.style.whiteSpace = 'pre-line';
-        why.textContent = reason +
-            '\n\nPossible fixes:' +
-            '\n• Restart your browser' +
-            '\n• Close all other tabs using WebGL' +
-            '\n• Try a different browser (e.g., Chrome, Firefox).' +
-            '\n• Update your graphics driver.'
-    }
 
+        let message;
+        if (noWebGL) {
+            message =
+                'Your browser or device does not support WebGL2.\n\n' +
+                'This application requires WebGL2 for 3D graphics.\n\n' +
+                'Possible fixes:' +
+                '\n• Use a modern desktop browser (Chrome, Firefox, Edge).' +
+                '\n• Ensure hardware acceleration is enabled in browser settings.' +
+                '\n• If you’re on a VM/remote session, try running locally.';
+        } else {
+            message =
+                reason +
+                '\n\nPossible fixes:' +
+                '\n• Restart your browser' +
+                '\n• Close all other tabs using WebGL' +
+                '\n• Try a different browser (e.g., Chrome, Firefox).' +
+                '\n• Update your graphics driver.';
+        }
+
+        why.textContent = message;
+    }
     try { if (rafId) cancelAnimationFrame(rafId); } catch {}
 }
 
 (function guardWebGL() {
     if (!('WebGL2RenderingContext' in window)) {
-        showFallback('Your browser does not support WebGL2.');
+        showFallback('Your browser does not support WebGL2.', { noWebGL: true });
         throw new Error('No WebGL2RenderingContext');
     }
     const testCanvas = document.createElement('canvas');
