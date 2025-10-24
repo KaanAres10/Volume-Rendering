@@ -57,6 +57,42 @@ const renderProps = {
 let renderer;
 let rafId;
 
+
+function showFallback(reason = 'WebGL is not supported or failed to initialize.') {
+    const fb = document.getElementById('fallback');
+    if (!fb) return;
+    fb.hidden = false;
+    const why = fb.querySelector('.why');
+    if (why) why.textContent = reason;
+
+    // Try to fetch README
+    fetch('https://raw.githubusercontent.com/KaanAres10/Volume-Rendering/main/README.md', { cache: 'no-cache' })
+        .then(r => r.ok ? r.text() : '')
+        .then(txt => {
+            const pre = fb.querySelector('.readme');
+            if (pre && txt) pre.textContent = txt;
+        })
+        .catch(() => {});
+
+    const threeRoot = document.getElementById('three-root');
+    const sidebar  = document.getElementById('sidebar');
+    if (threeRoot) threeRoot.style.display = 'none';
+    if (sidebar)   sidebar.style.display   = 'block';
+}
+
+(function guardWebGL() {
+    if (!('WebGL2RenderingContext' in window)) {
+        showFallback('Your browser does not support WebGL2.');
+        throw new Error('No WebGL2RenderingContext');
+    }
+    const testCanvas = document.createElement('canvas');
+    const gl = testCanvas.getContext('webgl2', { failIfMajorPerformanceCaveat: true });
+    if (!gl) {
+        showFallback('WebGL2 context could not be created (graphics driver or browser limitation).');
+        throw new Error('WebGL2 context creation failed');
+    }
+})();
+
 function initRenderer(container) {
     if (renderer) return renderer;
 
@@ -79,6 +115,7 @@ function initRenderer(container) {
         e.preventDefault();
         cancelAnimationFrame(rafId);
         console.warn('WebGL context lost');
+        showFallback('WebGL context was lost (the GPU/browser disabled the context).');
     });
 
     renderer.domElement.addEventListener('webglcontextrestored', () => {
@@ -89,7 +126,6 @@ function initRenderer(container) {
 
     return renderer;
 }
-
 function setVolumeTexture(newTex) {
     const oldTex = material.uniforms.dataTexture.value;
     if (oldTex && oldTex !== newTex) {
