@@ -4,6 +4,11 @@ An interactive web-based **Direct Volume Rendering (DVR)**
 
 It supports medical and scientific datasets (`.nii`, `.nii.gz`,  `.raw + .json`), with shading, transfer functions, multiple rendering modes.
 
+## Video
+https://github.com/user-attachments/assets/39fb1a86-e2f1-4283-bd13-cd12a19b9334
+
+---
+
 **Project Website:** [https://kaanares10.github.io/Volume-Rendering](https://kaanares10.github.io/Volume-Rendering)
 
 <p align="center">
@@ -11,10 +16,6 @@ It supports medical and scientific datasets (`.nii`, `.nii.gz`,  `.raw + .json`)
 </p>
 
 
----
-
-## Video
-https://github.com/user-attachments/assets/39fb1a86-e2f1-4283-bd13-cd12a19b9334
 
 
 Transfer function editor components are adapted from  
